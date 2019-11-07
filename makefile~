@@ -1,0 +1,13 @@
+CX = g++
+
+CXXFLAGS = -g -Wall -pthread
+
+all: cheesecloth
+
+cheesecloth: cheesecloth.o
+	$(CXX) $(CXXFLAGS) -o cheesecloth cheesecloth.o
+
+cheesecloth.o:
+
+clean:
+	rm -f cheesecloth *.o *.gch
