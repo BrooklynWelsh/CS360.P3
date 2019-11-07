@@ -1,5 +1,5 @@
 
-This is a test for github
+//This is a test for github
 #include <iostream>
 #include <pthread.h>
 #include <string>
