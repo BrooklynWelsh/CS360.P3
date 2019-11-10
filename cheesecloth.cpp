@@ -65,127 +65,118 @@ int main(int argc, char** argv){
   pthread_t printThread;
   pthread_create(&printThread, NULL, readFinalQueue, NULL);
   
-      pthread_join(inputThread, NULL);
-      for(int i = 0; i < N_THREADS; i++)
-	{
-	  pthread_join(filterThread1[i], NULL);
-	  pthread_join(filterThread2[i], NULL);
-	  pthread_join(filterThread3[i], NULL);
-	}
-	pthread_join(printThread, NULL);
+  pthread_join(inputThread, NULL);
+  for(int i = 0; i < N_THREADS; i++)
+  {
+    pthread_join(filterThread1[i], NULL);
+    pthread_join(filterThread2[i], NULL);
+    pthread_join(filterThread3[i], NULL);
+  }
+  pthread_join(printThread, NULL);
 	
   return 0;
 }
 
 void* readInput(void* arg){
-	long long input;
+  long long input;
 
-	do{
-		cin >> input;
-		//locking the first queue
-		pthread_mutex_lock(&inputLock);
-		inputQueue.push(input);
-		pthread_mutex_unlock(&inputLock);
-	}while(input != 0);//stops when 0 comes up
-	for(int i = 0; i < N_THREADS && input == 0; i++)
-	  {
-	    inputQueue.push(input);
-	  }
-	return NULL;
+  do{
+    cin >> input;
+    //locking the first queue
+    pthread_mutex_lock(&inputLock);
+    inputQueue.push(input);
+    pthread_mutex_unlock(&inputLock);
+  }while(input != 0);//stops when 0 comes up
+
+  for(int i = 0; i < N_THREADS && input == 0; i++)
+  {
+    inputQueue.push(input);
+  }
+return NULL;
 }
 
 void* filterOdds(void* arg){
-  
-        //locks the first queue
-	bool quit = false;
-	do{
-	  pthread_mutex_lock(&inputLock);
-	  while(inputQueue.empty()){//spins while queue is empty
-	  		pthread_mutex_unlock(&inputLock);
-			pthread_mutex_lock(&inputLock);
-	  	}
-	      
-			quit = (inputQueue.front() == 0);
-		 //once we have the first queue locked, lock the second
+  long long number;
+  bool quit = false;
+  do{
+    pthread_mutex_lock(&inputLock);
+    while(inputQueue.empty()){//spins while queue is empty
+      pthread_mutex_unlock(&inputLock);
+      pthread_mutex_lock(&inputLock);
+    }
+    number = inputQueue.front();
+    inputQueue.pop();
+    pthread_mutex_unlock(&inputLock);
+
+    quit = (number == 0);
 		
-		if(isOdd(inputQueue.front()) || inputQueue.front() == 0){
-		  pthread_mutex_lock(&oddLock);
-		  oddQueue.push(inputQueue.front());//transfer num from first queue to second
-		  pthread_mutex_unlock(&oddLock);
-		  //cout << "Made it through odd filter :" << inputQueue.front() << endl;
-		}
+    if(isOdd(number) || number == 0){
+      pthread_mutex_lock(&oddLock);
+      oddQueue.push(number);//transfer num from first queue to second
+      pthread_mutex_unlock(&oddLock);
+      //cout << "Made it through odd filter :" << number << endl;
+    }
 
-		//we are done with th e second queue, so we can unlock it
+  }while(!quit);
 
-		inputQueue.pop();//delete num from first queue
-		pthread_mutex_unlock(&inputLock);
-	    
-	}while(!quit);/*wasnt sure what to put here, condition may need to be changed*/
-	//oddQueue.push(inputQueue.front());
-        //finally unlock first queue
-
-	return NULL;
+return NULL;
 }
 
 void* filterFib(void* arg){ //almost the exact same as filterOdds()
-	/*not sure hweather to put lock and unlock inside or out of do-while statement*/
-	bool quit = false;
-	do{
-	  pthread_mutex_lock(&oddLock);
-		while(oddQueue.empty()){
-			pthread_mutex_unlock(&oddLock);
-			pthread_mutex_lock(&oddLock);
-		}
+  long long number;
+  bool quit = false;
+  do{
+    pthread_mutex_lock(&oddLock);
+    while(oddQueue.empty()){
+      pthread_mutex_unlock(&oddLock);
+      pthread_mutex_lock(&oddLock);
+    }
+    number = oddQueue.front();
+    oddQueue.pop();
+    pthread_mutex_unlock(&oddLock);
 
-		quit = (oddQueue.front() == 0);
+    quit = (number == 0);
 		
-		
-		if(inFibonacci(oddQueue.front()) || oddQueue.front() == 0){
-		  pthread_mutex_lock(&fibLock);
-		  fibQueue.push(oddQueue.front());
-		  pthread_mutex_unlock(&fibLock);
-		  //cout << "made it through fibonacci: " << oddQueue.front() << endl; 
-		}
+    if(inFibonacci(number) || number == 0){
+      pthread_mutex_lock(&fibLock);
+      fibQueue.push(number);
+      pthread_mutex_unlock(&fibLock);
+      //cout << "made it through fibonacci: " << number << endl; 
+    }
 
-		oddQueue.pop();
-
-		pthread_mutex_unlock(&oddLock);
-	}while(!quit);
-
+  }while(!quit);
 	
-
-	return NULL;
+return NULL;
 }
 
 void* filterCollatz(void* arg)
 {
-  	/*not sure whether to put lock and unlock inside or out of do-while statement*/
-	bool quit = false;
-	do{
-	  pthread_mutex_lock(&fibLock);
-	  //cout << "collatz is about to start spinning " << endl;
-		while(fibQueue.empty()){
-			pthread_mutex_unlock(&fibLock);
-			pthread_mutex_lock(&fibLock);
-		}
-		//cout << "collatz made it past spin lock " << endl;
-		quit = (fibQueue.front() == 0);
+  long long number;
+  bool quit = false;
+  do{
+    pthread_mutex_lock(&fibLock);
+    //cout << "collatz is about to start spinning " << endl;
+    while(fibQueue.empty()){
+      pthread_mutex_unlock(&fibLock);
+      pthread_mutex_lock(&fibLock);
+    }
+    number = fibQueue.front();
+    fibQueue.pop();
+    pthread_mutex_unlock(&fibLock);
+    //cout << "collatz made it past spin lock " << endl;
+    quit = (number == 0);
 
-		//cout << "collatz made it past quit statement" << endl;
-		if(collatzSteps(fibQueue.front()) || fibQueue.front() == 0){
-		  pthread_mutex_lock(&finalLock);
-		  finalQueue.push(fibQueue.front());
-		  pthread_mutex_unlock(&finalLock);
-		}
+    //cout << "collatz made it past quit statement" << endl;
+    if(collatzSteps(number) || number == 0){
+      pthread_mutex_lock(&finalLock);
+      finalQueue.push(number);
+      pthread_mutex_unlock(&finalLock);
+    }
 
-		fibQueue.pop();
-
-		pthread_mutex_unlock(&fibLock);
-	}while(!quit);
+  }while(!quit);
 
 
-	return NULL;
-
+return NULL;
 }
 
 
@@ -239,39 +230,39 @@ bool isPerfectSquare(long long x)
 
 bool inFibonacci(long long num){												    
   //cycles through fibonacci sequence checking to see if num is part of sequence at every step				    
-								   //	we could also calculate the fib sequence once (from 0 to 2^64) and store it in an array if this takes too long.	    
-	bool inFib = false;													    
-	long long fib1 = 0;													    
-	long long fib2 = 1;													    
-	long long fibn =0;													    
+	//	we could also calculate the fib sequence once (from 0 to 2^64) and store it in an array if this takes too long.	    
+    bool inFib = false;													    
+    long long fib1 = 0;													    
+    long long fib2 = 1;													    
+    long long fibn =0;													    
 																    
-	while (fibn <= num){													    
-		fibn = fib1 + fib2;												    
+    while (fibn <= num){													    
+	fibn = fib1 + fib2;												    
 																    
-		if(fibn == num || fib1 == num || fib2 == num){									    
-			inFib = true;												    
-		}														    
+	if(fibn == num || fib1 == num || fib2 == num){									    
+	    inFib = true;												    
+	}														    
 																    
-		fib1 = fib2;													    
-		fib2 = fibn;													    
-	}															    
-	return inFib;														    
+	fib1 = fib2;													    
+	fib2 = fibn;													    
+    }															    
+    return inFib;														    
 
 }
 
 bool collatzSteps(long long num)
 {
   // Same as collatzSteps from codeAlong, just checks if number ever becomes 40 during the process
-  while(num != 1 && num != 0 )
+    while(num != 1 && num != 0 )
     {
-      if(num == 40) return true;
-      if(num % 2 == 0)
+	if(num == 40) return true;
+	if(num % 2 == 0)
 	{
-	  num /= 2;
+	    num /= 2;
 	}else{
-	num *= 3;
-	num++;
-      }
+	    num *= 3;
+	    num++;
+        }
     }
   return false;
 }
