@@ -23,6 +23,12 @@ pthread_mutex_t oddLock = PTHREAD_MUTEX_INITIALIZER; //locks odd queue
 pthread_mutex_t fibLock = PTHREAD_MUTEX_INITIALIZER; //locks fib queue
 pthread_mutex_t finalLock = PTHREAD_MUTEX_INITIALIZER; //locks colatz queue
 
+pthread_cond_t input_queue_not_empty = PTHREAD_COND_INITIALIZER;
+pthread_cond_t odd_queue_not_empty = PTHREAD_COND_INITIALIZER;
+pthread_cond_t fib_queue_not_empty = PTHREAD_COND_INITIALIZER;
+pthread_cond_t collatz_queue_not_empty = PTHREAD_COND_INITIALIZER;
+pthread_cond_t final_queue_not_empty = PTHREAD_COND_INITIALIZER;
+
 //bool quit = false;
 int N_THREADS = 0;
 
@@ -85,12 +91,14 @@ void* readInput(void* arg){
     //locking the first queue
     pthread_mutex_lock(&inputLock);
     inputQueue.push(input);
+    pthread_cond_signal(&input_queue_not_empty);
     pthread_mutex_unlock(&inputLock);
   }while(input != 0);//stops when 0 comes up
 
   for(int i = 0; i < N_THREADS && input == 0; i++)
   {
     inputQueue.push(input);
+    pthread_cond_signal(&input_queue_not_empty);
   }
 return NULL;
 }
@@ -101,8 +109,7 @@ void* filterOdds(void* arg){
   do{
     pthread_mutex_lock(&inputLock);
     while(inputQueue.empty()){//spins while queue is empty
-      pthread_mutex_unlock(&inputLock);
-      pthread_mutex_lock(&inputLock);
+      pthread_cond_wait(&input_queue_not_empty, &inputLock);
     }
     number = inputQueue.front();
     inputQueue.pop();
@@ -113,6 +120,7 @@ void* filterOdds(void* arg){
     if(isOdd(number) || number == 0){
       pthread_mutex_lock(&oddLock);
       oddQueue.push(number);//transfer num from first queue to second
+      pthread_cond_signal(&odd_queue_not_empty);
       pthread_mutex_unlock(&oddLock);
       //cout << "Made it through odd filter :" << number << endl;
     }
@@ -128,8 +136,7 @@ void* filterFib(void* arg){ //almost the exact same as filterOdds()
   do{
     pthread_mutex_lock(&oddLock);
     while(oddQueue.empty()){
-      pthread_mutex_unlock(&oddLock);
-      pthread_mutex_lock(&oddLock);
+      pthread_cond_wait(&odd_queue_not_empty, &oddLock);
     }
     number = oddQueue.front();
     oddQueue.pop();
@@ -140,6 +147,7 @@ void* filterFib(void* arg){ //almost the exact same as filterOdds()
     if(inFibonacci(number) || number == 0){
       pthread_mutex_lock(&fibLock);
       fibQueue.push(number);
+      pthread_cond_signal(&fib_queue_not_empty);
       pthread_mutex_unlock(&fibLock);
       //cout << "made it through fibonacci: " << number << endl; 
     }
@@ -157,8 +165,7 @@ void* filterCollatz(void* arg)
     pthread_mutex_lock(&fibLock);
     //cout << "collatz is about to start spinning " << endl;
     while(fibQueue.empty()){
-      pthread_mutex_unlock(&fibLock);
-      pthread_mutex_lock(&fibLock);
+      pthread_cond_wait(&fib_queue_not_empty, &fibLock);
     }
     number = fibQueue.front();
     fibQueue.pop();
@@ -170,6 +177,7 @@ void* filterCollatz(void* arg)
     if(collatzSteps(number) || number == 0){
       pthread_mutex_lock(&finalLock);
       finalQueue.push(number);
+      pthread_cond_signal(&final_queue_not_empty);
       pthread_mutex_unlock(&finalLock);
     }
 
@@ -189,8 +197,7 @@ void* readFinalQueue(void* arg)
       pthread_mutex_lock(&finalLock);
       while(finalQueue.empty())
 	{
-	  pthread_mutex_unlock(&finalLock);
-	  pthread_mutex_lock(&finalLock);
+	  pthread_cond_wait(&final_queue_not_empty, &finalLock);
 	}
 
       if(finalQueue.front() == 0)
