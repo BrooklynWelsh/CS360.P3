@@ -98,6 +98,7 @@ void* readInput(void* arg){
   for(int i = 0; i < N_THREADS && input == 0; i++)
   {
     inputQueue.push(input);
+    pthread_cond_signal(&input_queue_not_empty);
   }
 return NULL;
 }
