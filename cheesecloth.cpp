@@ -2,7 +2,7 @@
 //This is a test for github
 #include <iostream>
 #include <pthread.h>
-#include <string>
+#include <string.h>
 #include <stdio.h>
 #include <queue>
 #include <math.h>
@@ -39,48 +39,64 @@ void* filterFib(void*);
 void* filterCollatz(void*);
 void* readFinalQueue(void*);
 
+void checkForErrors();
+
 bool isOdd(long long);
 bool inFibonacci(long long);
 bool collatzSteps(long long);
 
-int main(int argc, char** argv){
-  // NOTE : Numbers that pass odd filter but not fibonacci (i.e. 7) break the program...
+int main(int argc, char** argv)
+{
+  if(argc <= 1 || stoi(argv[1]) <= 0)    // Check that user has given a number_of_threads arg AND that it is greater than 0
+    {
+      cout << endl << "USAGE: \"./cheesecloth <number_of_threads>\"  (number_of_threads must be greater than 0)" << endl;
+      exit(-1);
+    }
+    
   N_THREADS = stoi(argv[1]);
   
   pthread_t inputThread;
-  pthread_create(&inputThread, NULL, readInput, NULL);
+  if(pthread_create(&inputThread, NULL, readInput, NULL) != 0) checkForErrors();   // pthread_create and pthread_join return 0 on success, anything else and we've got a problem
   
   pthread_t filterThread1[N_THREADS];
   for(int i = 0; i < N_THREADS; i++)
     {
-      pthread_create(&filterThread1[i], NULL, filterOdds, NULL);
+      if(pthread_create(&filterThread1[i], NULL, filterOdds, NULL) != 0) checkForErrors();
     }
   
   pthread_t filterThread2[N_THREADS];
   for(int i = 0; i < N_THREADS; i++)
     {
-      pthread_create(&filterThread2[i], NULL, filterFib, NULL);
+      if(pthread_create(&filterThread2[i], NULL, filterFib, NULL) != 0) checkForErrors();
     }
   
   pthread_t filterThread3[N_THREADS];
   for(int i = 0; i < N_THREADS; i++)
     {
-      pthread_create(&filterThread3[i], NULL, filterCollatz, NULL);
+      if(pthread_create(&filterThread3[i], NULL, filterCollatz, NULL) != 0) checkForErrors();
     }
 	
   pthread_t printThread;
-  pthread_create(&printThread, NULL, readFinalQueue, NULL);
+  if(pthread_create(&printThread, NULL, readFinalQueue, NULL) != 0) checkForErrors();
   
   pthread_join(inputThread, NULL);
   for(int i = 0; i < N_THREADS; i++)
   {
-    pthread_join(filterThread1[i], NULL);
-    pthread_join(filterThread2[i], NULL);
-    pthread_join(filterThread3[i], NULL);
+    if(pthread_join(filterThread1[i], NULL) != 0) checkForErrors();
+    if(pthread_join(filterThread2[i], NULL) != 0) checkForErrors();
+    if(pthread_join(filterThread3[i], NULL) != 0) checkForErrors();
   }
-  pthread_join(printThread, NULL);
+  if(pthread_join(printThread, NULL) != 0)  checkForErrors();
 	
   return 0;
+}
+
+void checkForErrors()
+{
+  char* error;
+  error = strerror_r(errno, error, 512);
+  cout << "ERROR: " << error << endl;
+  exit(-1);
 }
 
 void* readInput(void* arg){
@@ -89,16 +105,16 @@ void* readInput(void* arg){
   do{
     cin >> input;
     //locking the first queue
-    pthread_mutex_lock(&inputLock);
+    if(pthread_mutex_lock(&inputLock) != 0) checkForErrors();
     inputQueue.push(input);
-    pthread_cond_signal(&input_queue_not_empty);
-    pthread_mutex_unlock(&inputLock);
+    if(pthread_cond_signal(&input_queue_not_empty) != 0) checkForErrors();
+    if(pthread_mutex_unlock(&inputLock) != 0)  checkForErrors();
   }while(input != 0);//stops when 0 comes up
 
   for(int i = 0; i < N_THREADS && input == 0; i++)
   {
     inputQueue.push(input);
-    pthread_cond_signal(&input_queue_not_empty);
+    if(pthread_cond_signal(&input_queue_not_empty) != 0) checkForErrors();
   }
 return NULL;
 }
@@ -107,21 +123,22 @@ void* filterOdds(void* arg){
   long long number;
   bool quit = false;
   do{
-    pthread_mutex_lock(&inputLock);
-    while(inputQueue.empty()){//spins while queue is empty
-      pthread_cond_wait(&input_queue_not_empty, &inputLock);
-    }
+    if(pthread_mutex_lock(&inputLock) != 0) checkForErrors();
+    while(inputQueue.empty())
+      {
+	if(pthread_cond_wait(&input_queue_not_empty, &inputLock) != 0) checkForErrors();
+      }
     number = inputQueue.front();
     inputQueue.pop();
-    pthread_mutex_unlock(&inputLock);
+    if(pthread_mutex_unlock(&inputLock) != 0) checkForErrors();
 
     quit = (number == 0);
 		
     if(isOdd(number) || number == 0){
-      pthread_mutex_lock(&oddLock);
+      if(pthread_mutex_lock(&oddLock) != 0) checkForErrors();
       oddQueue.push(number);//transfer num from first queue to second
-      pthread_cond_signal(&odd_queue_not_empty);
-      pthread_mutex_unlock(&oddLock);
+      if(pthread_cond_signal(&odd_queue_not_empty) != 0) checkForErrors();
+      if(pthread_mutex_unlock(&oddLock) != 0) checkForErrors();
       //cout << "Made it through odd filter :" << number << endl;
     }
 
@@ -134,21 +151,21 @@ void* filterFib(void* arg){ //almost the exact same as filterOdds()
   long long number;
   bool quit = false;
   do{
-    pthread_mutex_lock(&oddLock);
+    if(pthread_mutex_lock(&oddLock) != 0) checkForErrors();
     while(oddQueue.empty()){
-      pthread_cond_wait(&odd_queue_not_empty, &oddLock);
+      if(pthread_cond_wait(&odd_queue_not_empty, &oddLock) != 0) checkForErrors();
     }
     number = oddQueue.front();
     oddQueue.pop();
-    pthread_mutex_unlock(&oddLock);
+    if(pthread_mutex_unlock(&oddLock) != 0) checkForErrors();
 
     quit = (number == 0);
 		
     if(inFibonacci(number) || number == 0){
-      pthread_mutex_lock(&fibLock);
+      if(pthread_mutex_lock(&fibLock) != 0) checkForErrors();
       fibQueue.push(number);
-      pthread_cond_signal(&fib_queue_not_empty);
-      pthread_mutex_unlock(&fibLock);
+      if(pthread_cond_signal(&fib_queue_not_empty) != 0) checkForErrors();
+      if(pthread_mutex_unlock(&fibLock) != 0) checkForErrors();
       //cout << "made it through fibonacci: " << number << endl; 
     }
 
@@ -162,23 +179,23 @@ void* filterCollatz(void* arg)
   long long number;
   bool quit = false;
   do{
-    pthread_mutex_lock(&fibLock);
+    if(pthread_mutex_lock(&fibLock) != 0) checkForErrors();
     //cout << "collatz is about to start spinning " << endl;
     while(fibQueue.empty()){
-      pthread_cond_wait(&fib_queue_not_empty, &fibLock);
+      if(pthread_cond_wait(&fib_queue_not_empty, &fibLock) != 0) checkForErrors();
     }
     number = fibQueue.front();
     fibQueue.pop();
-    pthread_mutex_unlock(&fibLock);
+    if(pthread_mutex_unlock(&fibLock) != 0) checkForErrors();
     //cout << "collatz made it past spin lock " << endl;
     quit = (number == 0);
 
     //cout << "collatz made it past quit statement" << endl;
     if(collatzSteps(number) || number == 0){
-      pthread_mutex_lock(&finalLock);
+      if(pthread_mutex_lock(&finalLock) != 0) checkForErrors();
       finalQueue.push(number);
-      pthread_cond_signal(&final_queue_not_empty);
-      pthread_mutex_unlock(&finalLock);
+      if(pthread_cond_signal(&final_queue_not_empty) != 0) checkForErrors();
+      if(pthread_mutex_unlock(&finalLock) != 0) checkForErrors();
     }
 
   }while(!quit);
@@ -194,10 +211,10 @@ void* readFinalQueue(void* arg)
   int counter = 0;
   do
     {
-      pthread_mutex_lock(&finalLock);
+      if(pthread_mutex_lock(&finalLock) != 0) checkForErrors();
       while(finalQueue.empty())
 	{
-	  pthread_cond_wait(&final_queue_not_empty, &finalLock);
+	  if(pthread_cond_wait(&final_queue_not_empty, &finalLock) != 0) checkForErrors();
 	}
 
       if(finalQueue.front() == 0)
@@ -208,7 +225,7 @@ void* readFinalQueue(void* arg)
       if(finalQueue.front() != 0) cout << "This number made it through all the filters: " << finalQueue.front()  << endl;
       finalQueue.pop();
 	
-      pthread_mutex_unlock(&finalLock);
+      if(pthread_mutex_unlock(&finalLock) != 0) checkForErrors();
     }while(!quit);
   return NULL;
 }
