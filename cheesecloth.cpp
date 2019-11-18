@@ -1,5 +1,9 @@
+// Dylan Wahl and Brooklyn Welsh
+// Dr Meehean
+// CS 360
+// 11/17/2019
+// Operating Systems Project 3
 
-//This is a test for github
 #include <iostream>
 #include <pthread.h>
 #include <string.h>
