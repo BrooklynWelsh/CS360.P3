@@ -1,4 +1,4 @@
-CX = g++
+CXX = g++
 
 CXXFLAGS = -g -Wall -pthread
 
