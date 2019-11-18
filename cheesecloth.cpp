@@ -96,7 +96,11 @@ void checkForErrors()
   char* error;
   error = strerror_r(errno, error, 512);
   cout << "ERROR: " << error << endl;
-  exit(-1);
+  // Now lock the input queue, send in a zero, signal, and unlock
+  pthread_mutex_lock(&inputLock);
+  inputQueue.push(0);
+  pthread_cond_signal(&input_queue_not_empty);
+  pthread_mutex_unlock(&inputLock);
 }
 
 void* readInput(void* arg){
